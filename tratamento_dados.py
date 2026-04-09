@@ -1,8 +1,7 @@
-# tratamento_dados.py
 import re
 from copy import copy
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime
 
 import pandas as pd
 from openpyxl import load_workbook
@@ -28,22 +27,22 @@ PRODUTOS_PATH = SHAREPOINT_DIR / "produtos.xlsx"
 # =========================
 # Helpers
 # =========================
-def _find_olist_file_xlsx(yyyymm: str) -> Path:
+def _find_latest_file_by_prefix(prefix: str, yyyymm: str) -> Path:
     """
-    Procura o arquivo olist_relatorio_YYYYMM.xlsx em DOWNLOADS_DIR.
+    Procura o arquivo {prefix}_{yyyymm}.xlsx em DOWNLOADS_DIR.
     Se não achar exato, pega o mais recente que combine com o prefixo.
     """
-    exact = DOWNLOADS_DIR / f"olist_relatorio_{yyyymm}.xlsx"
+    exact = DOWNLOADS_DIR / f"{prefix}_{yyyymm}.xlsx"
     if exact.exists():
         return exact
 
-    pattern = re.compile(rf"^olist_relatorio_{yyyymm}\.xlsx$", re.IGNORECASE)
-    candidates = [p for p in DOWNLOADS_DIR.glob("olist_relatorio_*.xlsx") if pattern.match(p.name)]
+    pattern = re.compile(rf"^{re.escape(prefix)}_{yyyymm}\.xlsx$", re.IGNORECASE)
+    candidates = [p for p in DOWNLOADS_DIR.glob(f"{prefix}_*.xlsx") if pattern.match(p.name)]
     if candidates:
         return max(candidates, key=lambda p: p.stat().st_mtime)
 
     raise FileNotFoundError(
-        f"Não encontrei o arquivo olist_relatorio_{yyyymm}.xlsx em: {DOWNLOADS_DIR}"
+        f"Não encontrei o arquivo {prefix}_{yyyymm}.xlsx em: {DOWNLOADS_DIR}"
     )
 
 
@@ -59,6 +58,26 @@ def _read_olist_xlsx(path: Path) -> pd.DataFrame:
     df.columns = [str(c).strip() if c is not None else "" for c in df.columns]
     df = df.fillna("")
     return df
+
+
+def _read_olist_bases_consolidadas(yyyymm: str) -> pd.DataFrame:
+    """
+    Lê os relatórios 1 das duas empresas e concatena em um único DataFrame.
+    """
+    path_1 = _find_latest_file_by_prefix("olist_relatorio", yyyymm)
+    path_2 = _find_latest_file_by_prefix("olist_relatorio_empresa2", yyyymm)
+
+    print(f"Lendo Olist empresa 1: {path_1} (aba 'Notas fiscais')")
+    df_1 = _read_olist_xlsx(path_1)
+    df_1["Origem Empresa"] = "Empresa 1"
+
+    print(f"Lendo Olist empresa 2: {path_2} (aba 'Notas fiscais')")
+    df_2 = _read_olist_xlsx(path_2)
+    df_2["Origem Empresa"] = "Empresa 2"
+
+    df_final = pd.concat([df_1, df_2], ignore_index=True)
+    print(f"Bases Olist consolidadas: {len(df_1)} + {len(df_2)} = {len(df_final)} linhas")
+    return df_final
 
 
 def _read_produtos_xlsx(path: Path) -> pd.DataFrame:
@@ -134,7 +153,7 @@ def _last_data_row(ws, col_idx=1, start_row=2) -> int:
 
 def _copy_row_style(ws, src_row: int, dst_row: int, max_col: int):
     """
-    Copia estilos da linha src_row para dst_row (para manter "formato das células").
+    Copia estilos da linha src_row para dst_row.
     """
     for c in range(1, max_col + 1):
         src = ws.cell(row=src_row, column=c)
@@ -175,10 +194,6 @@ def _to_float_ptbr(s: str):
 def _strip_leading_zeros(value):
     """
     Remove zeros à esquerda de códigos numéricos em texto.
-    Exemplos:
-    000015 -> 15
-    000580 -> 580
-    000000 -> 0
     """
     if value is None:
         return None
@@ -201,10 +216,8 @@ def run():
     current_year = datetime.now().year
     current_month = datetime.now().month
 
-    # 1) Ler Olist XLSX (Notas fiscais)
-    olist_path = _find_olist_file_xlsx(yyyymm)
-    print(f"Lendo Olist: {olist_path} (aba 'Notas fiscais')")
-    df_olist = _read_olist_xlsx(olist_path)
+    # 1) Ler Olist consolidado (empresa 1 + empresa 2)
+    df_olist = _read_olist_bases_consolidadas(yyyymm)
 
     # 2) Ler Produtos (XLSX)
     print(f"Lendo Produtos: {PRODUTOS_PATH}")
@@ -213,7 +226,6 @@ def run():
     # Monta mapas para lookup por descrição
     prod_cols_norm = {_normalize(c): c for c in df_prod.columns}
 
-    # acha coluna Descrição (tolerante)
     desc_col = None
     for want in ("descricaoproduto", "descrição", "descricao", "itemdescricao"):
         for cnorm, corig in prod_cols_norm.items():
@@ -364,7 +376,7 @@ def run():
     def _olist_series(col_name: str):
         key = _normalize(col_name)
         if key not in olist_cols_norm:
-            raise RuntimeError(f"Não achei a coluna '{col_name}' no Olist (aba Notas fiscais).")
+            raise RuntimeError(f"Não achei a coluna '{col_name}' no Olist consolidado (aba Notas fiscais).")
         return df_olist[olist_cols_norm[key]]
 
     olist_series_map = {src: _olist_series(src) for src, _ in olist_to_feco if src}
@@ -404,7 +416,6 @@ def run():
         ws.cell(row=r, column=idx_cod_prod).value = map_cod.get(desc_norm, None)
         ws.cell(row=r, column=idx_cd_pintura).value = map_pint.get(desc_norm, None)
 
-        # Calcula em Python em vez de gravar fórmula no Excel
         vlr_merc = ws.cell(row=r, column=idx_vlr_merc).value
         vlr_desc = ws.cell(row=r, column=idx_vlr_desc).value
         vlr_frete = ws.cell(row=r, column=idx_vlr_frete).value

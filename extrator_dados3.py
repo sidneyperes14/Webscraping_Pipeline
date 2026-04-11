@@ -395,9 +395,17 @@ def run(headless: bool = True) -> Path:
         clicar('//*[@id="content"]/div[2]/div/div[1]/ul/li[1]/a')
         trocar_para_nova_aba(abas_antes)
 
-        # aguarda o relatório ficar pronto
-        print("Aguardando 8 minutos e 5 segundos para geração do relatório...")
-        time.sleep(485)
+        # aguarda o relatório ficar pronto, mantendo a sessão ativa
+        espera_total = 485
+        intervalo = 30
+        print(f"Aguardando {espera_total // 60} minutos e {espera_total % 60} segundos para geração do relatório...")
+        inicio_espera = time.time()
+        while time.time() - inicio_espera < espera_total:
+            time.sleep(min(intervalo, espera_total - (time.time() - inicio_espera)))
+            try:
+                driver.current_url  # keep-alive: evita timeout da sessão
+            except Exception:
+                pass
 
         # localizar o botão do relatório mais recente e baixar
         downloaded_file = esperar_download_apos_clique(timeout_sec=300)

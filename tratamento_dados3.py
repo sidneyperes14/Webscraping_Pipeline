@@ -20,9 +20,10 @@ except Exception as e:
     ) from e
 
 SHAREPOINT_DIR: Path = Path(config.SHAREPOINT_DIR)
+DASHBOARD_DATA_DIR: Path = Path(config.DASHBOARD_DATA_DIR)
 DOWNLOADS_DIR: Path = Path(config.DOWNLOADS_DIR)
 
-ARQUIVO_DATA_ENTREGA_PATH = SHAREPOINT_DIR / "Arquivo - Data de entrega pedidos.xlsx"
+ARQUIVO_DATA_ENTREGA_PATH = DASHBOARD_DATA_DIR / "Arquivo - Data de entrega pedidos.xlsx"
 
 
 # =========================

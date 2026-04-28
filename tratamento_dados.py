@@ -20,9 +20,10 @@ except Exception as e:
     ) from e
 
 SHAREPOINT_DIR: Path = Path(config.SHAREPOINT_DIR)
+DASHBOARD_DATA_DIR: Path = Path(config.DASHBOARD_DATA_DIR)
 DOWNLOADS_DIR: Path = Path(config.DOWNLOADS_DIR)
 
-FECOMMERCE_PATH = SHAREPOINT_DIR / "fEcommerce.xlsx"
+FECOMMERCE_PATH = DASHBOARD_DATA_DIR / "fEcommerce.xlsx"
 PRODUTOS_PATH = SHAREPOINT_DIR / "produtos.xlsx"
 
 

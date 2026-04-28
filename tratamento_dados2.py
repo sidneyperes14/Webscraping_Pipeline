@@ -22,9 +22,10 @@ except Exception as e:
     ) from e
 
 SHAREPOINT_DIR: Path = Path(config.SHAREPOINT_DIR)
+DASHBOARD_DATA_DIR: Path = Path(config.DASHBOARD_DATA_DIR)
 DOWNLOADS_DIR: Path = Path(config.DOWNLOADS_DIR)
 
-RESUMO_PROFORMA_PATH = SHAREPOINT_DIR / "resumo_proforma_pedido.xlsx"
+RESUMO_PROFORMA_PATH = DASHBOARD_DATA_DIR / "resumo_proforma_pedido.xlsx"
 
 
 # =========================

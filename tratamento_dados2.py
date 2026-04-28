@@ -8,6 +8,8 @@ from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
 
+from utils import esperar_arquivo_disponivel, matar_excel_zumbi, resalvar_via_excel
+
 
 # =========================
 # Config
@@ -211,6 +213,8 @@ def run():
         raise FileNotFoundError(f"Nao encontrei resumo_proforma_pedido.xlsx em: {RESUMO_PROFORMA_PATH}")
 
     print(f"Abrindo: {RESUMO_PROFORMA_PATH}")
+    matar_excel_zumbi()
+    esperar_arquivo_disponivel(RESUMO_PROFORMA_PATH, timeout_sec=180)
     wb = load_workbook(RESUMO_PROFORMA_PATH)
     if "resumo_proforma_pedido" not in wb.sheetnames:
         raise RuntimeError("A aba 'resumo_proforma_pedido' nao existe no arquivo de destino.")
@@ -301,6 +305,10 @@ def run():
     print("Salvando alteracoes...")
     wb.save(RESUMO_PROFORMA_PATH)
     wb.close()
+
+    print("Re-salvando resumo_proforma_pedido.xlsx via Excel para normalizar o arquivo...")
+    esperar_arquivo_disponivel(RESUMO_PROFORMA_PATH, timeout_sec=120)
+    resalvar_via_excel(RESUMO_PROFORMA_PATH)
 
     print("tratamento_dados2 concluido com sucesso.")
 

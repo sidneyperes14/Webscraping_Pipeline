@@ -409,7 +409,7 @@ def run(headless: bool = True) -> tuple[Path, Path, Path]:
         before_files = snapshot_downloads()
         clicar('//*[@id="btnExportarNotas"]')
 
-        downloaded_file = esperar_download(before_files, timeout_sec=300)
+        downloaded_file = esperar_download(before_files, timeout_sec=600)
         return renomear_e_converter(downloaded_file, "olist_relatorio")
 
     def baixar_relatorio_1_empresa2() -> Path:
@@ -431,7 +431,7 @@ def run(headless: bool = True) -> tuple[Path, Path, Path]:
         before_files = snapshot_downloads()
         clicar('//*[@id="btnExportarNotas"]')
 
-        downloaded_file = esperar_download(before_files, timeout_sec=300)
+        downloaded_file = esperar_download(before_files, timeout_sec=600)
         return renomear_e_converter(downloaded_file, "olist_relatorio_empresa2")
 
     def baixar_relatorio_2() -> Path:
@@ -448,7 +448,7 @@ def run(headless: bool = True) -> tuple[Path, Path, Path]:
         before_files = snapshot_downloads()
         clicar('//*[@id="root-relatorios-personalizados"]/div/div[1]/div[1]/div/div/div[1]/button[1]')
 
-        downloaded_file = esperar_download(before_files, timeout_sec=300)
+        downloaded_file = esperar_download(before_files, timeout_sec=600)
         return renomear_e_converter(downloaded_file, "olist_relatorio2")
 
     try:

@@ -105,6 +105,9 @@ def run(headless: bool = True) -> Path:
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-background-timer-throttling")
 
     prefs = {
         "download.default_directory": str(download_dir),
@@ -118,8 +121,10 @@ def run(headless: bool = True) -> Path:
         options.add_argument("--headless=new")
         options.add_argument("--disable-blink-features=AutomationControlled")
 
+    chromedriver_path = ChromeDriverManager().install()
+
     driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
+        service=Service(chromedriver_path),
         options=options,
     )
 
@@ -242,26 +247,35 @@ def run(headless: bool = True) -> Path:
         fim = time.time() + timeout
         ultima_qtd = 0
 
+        from selenium.common.exceptions import StaleElementReferenceException as _Stale
+
         while time.time() < fim:
             try:
                 esperar_overlay_sumir(timeout=5)
             except Exception:
                 pass
 
-            botoes = driver.find_elements(By.XPATH, xpath_botoes)
-            botoes_visiveis = [b for b in botoes if b.is_displayed()]
+            try:
+                botoes = driver.find_elements(By.XPATH, xpath_botoes)
+                botoes_visiveis = [b for b in botoes if b.is_displayed()]
+            except _Stale:
+                time.sleep(5)
+                continue
 
             if botoes_visiveis:
                 ultima_qtd = len(botoes_visiveis)
                 alvo = botoes_visiveis[0] if usar_primeiro else botoes_visiveis[-1]
 
-                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", alvo)
-                time.sleep(0.5)
-
                 try:
+                    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", alvo)
+                    time.sleep(0.5)
                     alvo.click()
-                except Exception:
-                    driver.execute_script("arguments[0].click();", alvo)
+                except (_Stale, Exception):
+                    try:
+                        driver.execute_script("arguments[0].click();", alvo)
+                    except _Stale:
+                        time.sleep(5)
+                        continue
 
                 print(f"Botão de download localizado. Total de botões encontrados: {ultima_qtd}")
                 return
@@ -395,17 +409,33 @@ def run(headless: bool = True) -> Path:
         clicar('//*[@id="content"]/div[2]/div/div[1]/ul/li[1]/a')
         trocar_para_nova_aba(abas_antes)
 
-        # aguarda o relatório ficar pronto, mantendo a sessão ativa
+        # salva a URL da página de relatórios e fecha o browser
+        url_relatorios = driver.current_url
+        driver.quit()
+
+        # aguarda o relatório ser gerado no servidor (browser fechado)
         espera_total = 485
-        intervalo = 30
         print(f"Aguardando {espera_total // 60} minutos e {espera_total % 60} segundos para geração do relatório...")
-        inicio_espera = time.time()
-        while time.time() - inicio_espera < espera_total:
-            time.sleep(min(intervalo, espera_total - (time.time() - inicio_espera)))
-            try:
-                driver.current_url  # keep-alive: evita timeout da sessão
-            except Exception:
-                pass
+        time.sleep(espera_total)
+
+        # reabre o browser e navega de volta
+        print("Espera concluída. Reabrindo browser para download...")
+        driver = webdriver.Chrome(
+            service=Service(chromedriver_path),
+            options=options,
+        )
+        wait = WebDriverWait(driver, 60)
+
+        driver.get(url)
+
+        # login novamente
+        preencher('//*[@id="_username"]', username)
+        preencher('//*[@id="_password"]', password)
+        clicar('//*[@id="send"]')
+
+        # navega para a página de relatórios
+        driver.get(url_relatorios)
+        time.sleep(5)
 
         # localizar o botão do relatório mais recente e baixar
         downloaded_file = esperar_download_apos_clique(timeout_sec=300)

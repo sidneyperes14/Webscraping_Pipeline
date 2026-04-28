@@ -58,6 +58,36 @@ def _limpar_arquivos_especificos(arquivos: list[Path]):
             print(f"Não foi possível excluir {arquivo.name}: {e}")
 
 
+def _limpar_downloads_pipeline():
+    """
+    Apaga todos os arquivos gerados pelo pipeline na pasta de downloads,
+    baseado nos prefixos usados pelos extractors.
+    """
+    padroes = [
+        "olist_relatorio_*.xls",
+        "olist_relatorio_*.xlsx",
+        "olist_relatorio2_*.xls",
+        "olist_relatorio2_*.xlsx",
+        "olist_relatorio_empresa2_*.xls",
+        "olist_relatorio_empresa2_*.xlsx",
+        "uoou_relatorio_*.xls",
+        "uoou_relatorio_*.xlsx",
+    ]
+
+    print("\nLimpando downloads do pipeline...")
+    total = 0
+    for padrao in padroes:
+        for arquivo in DOWNLOAD_DIR.glob(padrao):
+            try:
+                if arquivo.is_file():
+                    arquivo.unlink()
+                    print(f"Excluído: {arquivo.name}")
+                    total += 1
+            except Exception as e:
+                print(f"Não foi possível excluir {arquivo.name}: {e}")
+    print(f"Total de arquivos excluídos: {total}")
+
+
 def main():
     print("Iniciando pipeline HomeZy...")
     print(f"Pasta monitorada: {DOWNLOAD_DIR}")
@@ -83,6 +113,7 @@ def main():
 
         print("Pipeline finalizado com sucesso!")
         _limpar_arquivos_especificos(arquivos_para_limpar)
+        _limpar_downloads_pipeline()
         return 0
 
     except Exception as e:

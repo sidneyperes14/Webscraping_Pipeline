@@ -6,6 +6,8 @@ from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
 
+from utils import esperar_arquivo_disponivel, matar_excel_zumbi, resalvar_via_excel
+
 
 # =========================
 # Config
@@ -184,6 +186,8 @@ def run():
         )
 
     print(f"Abrindo: {ARQUIVO_DATA_ENTREGA_PATH}")
+    matar_excel_zumbi()
+    esperar_arquivo_disponivel(ARQUIVO_DATA_ENTREGA_PATH, timeout_sec=180)
     wb = load_workbook(ARQUIVO_DATA_ENTREGA_PATH)
     if "Planilha1" not in wb.sheetnames:
         raise RuntimeError("A aba 'Planilha1' não existe no arquivo de destino.")
@@ -272,6 +276,10 @@ def run():
     print("Salvando alterações...")
     wb.save(ARQUIVO_DATA_ENTREGA_PATH)
     wb.close()
+
+    print("Re-salvando Arquivo - Data de entrega pedidos.xlsx via Excel para normalizar o arquivo...")
+    esperar_arquivo_disponivel(ARQUIVO_DATA_ENTREGA_PATH, timeout_sec=120)
+    resalvar_via_excel(ARQUIVO_DATA_ENTREGA_PATH)
 
     print("tratamento_dados3 concluído com sucesso.")
 

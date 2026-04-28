@@ -6,6 +6,8 @@ from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
 
+from utils import esperar_arquivo_disponivel, matar_excel_zumbi, resalvar_via_excel
+
 
 # =========================
 # Config (usa config.py)
@@ -277,6 +279,8 @@ def run():
         raise FileNotFoundError(f"Não encontrei fEcommerce.xlsx em: {FECOMMERCE_PATH}")
 
     print(f"Abrindo fEcommerce: {FECOMMERCE_PATH}")
+    matar_excel_zumbi()
+    esperar_arquivo_disponivel(FECOMMERCE_PATH, timeout_sec=180)
     wb = load_workbook(FECOMMERCE_PATH)
     if "Planilha1" not in wb.sheetnames:
         raise RuntimeError("A aba 'Planilha1' não existe no fEcommerce.xlsx")
@@ -431,6 +435,10 @@ def run():
     print("Salvando alterações no fEcommerce.xlsx...")
     wb.save(FECOMMERCE_PATH)
     wb.close()
+
+    print("Re-salvando fEcommerce.xlsx via Excel para normalizar o arquivo...")
+    esperar_arquivo_disponivel(FECOMMERCE_PATH, timeout_sec=120)
+    resalvar_via_excel(FECOMMERCE_PATH)
 
     print("Tratamento concluído e fEcommerce atualizado com sucesso.")
 

@@ -6,7 +6,11 @@ from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
 
-from utils import esperar_arquivo_disponivel, matar_excel_zumbi, resalvar_via_excel
+from utils import (
+    esperar_arquivo_disponivel,
+    load_workbook_resiliente,
+    matar_excel_zumbi,
+)
 
 
 # =========================
@@ -282,7 +286,7 @@ def run():
     print(f"Abrindo fEcommerce: {FECOMMERCE_PATH}")
     matar_excel_zumbi()
     esperar_arquivo_disponivel(FECOMMERCE_PATH, timeout_sec=180)
-    wb = load_workbook(FECOMMERCE_PATH)
+    wb = load_workbook_resiliente(FECOMMERCE_PATH)
     if "Planilha1" not in wb.sheetnames:
         raise RuntimeError("A aba 'Planilha1' não existe no fEcommerce.xlsx")
 
@@ -386,6 +390,21 @@ def run():
 
     olist_series_map = {src: _olist_series(src) for src, _ in olist_to_feco if src}
 
+    # ===== Coluna "Empresa": identifica Homezy (Empresa 1) ou Bloomie (Empresa 2) =====
+    # A origem já vem em df_olist["Origem Empresa"], definida ao consolidar as duas bases.
+    empresa_col_name = "Empresa"
+    empresa_key_norm = _normalize(empresa_col_name)
+    if empresa_key_norm in hmap:
+        idx_empresa = hmap[empresa_key_norm]
+    else:
+        idx_empresa = ws.max_column + 1
+        ws.cell(row=1, column=idx_empresa).value = empresa_col_name
+        hmap[empresa_key_norm] = idx_empresa
+        print(f"Coluna '{empresa_col_name}' criada no fEcommerce (col {idx_empresa}).")
+
+    origem_empresa_series = _olist_series("Origem Empresa")
+    empresa_map = {"Empresa 1": "Homezy", "Empresa 2": "Bloomie"}
+
     print(f"Inserindo {len(df_olist)} linhas novas no final da Planilha1...")
 
     for i in range(len(df_olist)):
@@ -416,6 +435,9 @@ def run():
 
         ws.cell(row=r, column=idx_ano).value = current_year
 
+        origem = str(origem_empresa_series.iloc[i]).strip()
+        ws.cell(row=r, column=idx_empresa).value = empresa_map.get(origem, origem)
+
         desc = ws.cell(row=r, column=idx_desc_prod).value
         desc_norm = str(desc).strip().lower() if desc is not None else ""
         ws.cell(row=r, column=idx_cod_prod).value = map_cod.get(desc_norm, None)
@@ -433,13 +455,37 @@ def run():
         ws.cell(row=r, column=idx_vlr_unit_calc).value = vlr_unit_calc
         ws.cell(row=r, column=idx_vlr_unit_calc).number_format = money_number_format
 
+    # 3.3) Preencher a coluna "Tabela_Pedido" como chave (Nº Pedido + Razão Social)
+    #      para relacionar com a coluna "Tabela" do resumo_proforma_pedido.xlsx.
+    #      Cria a coluna no final se ela ainda não existir.
+    chave_col_name = "Tabela_Pedido"
+    chave_key_norm = _normalize(chave_col_name)
+    if chave_key_norm in hmap:
+        idx_chave = hmap[chave_key_norm]
+    else:
+        idx_chave = ws.max_column + 1
+        ws.cell(row=1, column=idx_chave).value = chave_col_name
+        hmap[chave_key_norm] = idx_chave
+        print(f"Coluna '{chave_col_name}' criada no fEcommerce (col {idx_chave}).")
+
+    idx_n_pedido = _feco_col_idx("Nº Pedido")
+    idx_razao_social = _feco_col_idx("Razão Social")
+
+    last_row_atual = _last_data_row(ws, col_idx=1, start_row=2)
+    preenchidas_chave = 0
+    for r in range(2, last_row_atual + 1):
+        ped_v = ws.cell(row=r, column=idx_n_pedido).value
+        if ped_v is None or str(ped_v).strip() == "":
+            continue
+        razao_v = ws.cell(row=r, column=idx_razao_social).value
+        chave = f"{str(ped_v).strip()}{str(razao_v or '').strip()}"
+        ws.cell(row=r, column=idx_chave).value = chave
+        preenchidas_chave += 1
+    print(f"Coluna '{chave_col_name}' preenchida em {preenchidas_chave} linhas.")
+
     print("Salvando alterações no fEcommerce.xlsx...")
     wb.save(FECOMMERCE_PATH)
     wb.close()
-
-    print("Re-salvando fEcommerce.xlsx via Excel para normalizar o arquivo...")
-    esperar_arquivo_disponivel(FECOMMERCE_PATH, timeout_sec=120)
-    resalvar_via_excel(FECOMMERCE_PATH)
 
     print("Tratamento concluído e fEcommerce atualizado com sucesso.")
 
